@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>I-664 Patrol Hub</title>
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#1a1a1a">
+  <link rel="apple-touch-icon" href="https://vdot.virginia.gov/favicon.ico">
+
+  <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22Patrol%20Hub%22,%22short_name%22:%22Patrol%22,%22start_url%22:%22index.html%22,%22display%22:%22standalone%22,%22background_color%22:%22%23000000%22,%22theme_color%22:%22%231a1a1a%22,%22icons%22:[{%22src%22:%22https://vdot.virginia.gov/favicon.ico%22,%22sizes%22:%22192x192%22,%22type%22:%22image/png%22}]}">
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+  <style>
+    body, html { margin: 0; padding: 0; height: 100%; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
+    #content { height: calc(100% - 75px); overflow-y: auto; }
+    #map-view { height: calc(100% - 75px); width: 100%; display: none; background: #fff; }
+    
+    #wall { display: grid; gap: 4px; padding: 4px; grid-template-columns: 1fr; }
+    @media (min-width: 768px) { #wall { grid-template-columns: 1fr 1fr; } }
+    
+    .cam-card { position: relative; background: #111; aspect-ratio: 16/9; border: 1px solid #333; }
+    video { width: 100%; height: 100%; object-fit: cover; }
+    
+    .label { position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,0.85); padding: 8px; font-size: 0.85rem; font-weight: bold; display: flex; justify-content: space-between; z-index: 10; }
+    .btn-loc { background: #0056b3; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; }
+
+    .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 75px; background: #1a1a1a; display: flex; border-top: 2px solid #444; padding-bottom: env(safe-area-inset-bottom); }
+    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: none; background: none; color: #888; font-size: 0.8rem; font-weight: bold; }
+    .nav-item.active { color: #fff; background: #333; border-top: 4px solid #0056b3; }
+
+    .map-pop { width: 280px; color: #000; font-weight: bold; text-align: center; }
+    .map-pop video { width: 100%; aspect-ratio: 16/9; background: #000; margin-top: 8px; border: 2px solid #0056b3; border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+  <div id="content"><div id="wall"></div></div>
+  <div id="map-view"></div>
+
+  <nav class="nav-bar">
+    <button class="nav-item active" id="btn-mmbt" onclick="nav('mmbt')">MMBT</button>
+    <button class="nav-item" id="btn-i664" onclick="nav('i664')">I-664</button>
+    <button class="nav-item" id="btn-map" onclick="nav('map')">MAP</button>
+    <button class="nav-item" style="color:#ff4444" onclick="location.reload()">SYNC</button>
+  </nav>
+
+  <script>
+    const cameras = {
+      mmbt: [
+        { name: "MMBT North Bound Exit (NN Side)", lat: 36.9582, lng: -76.41000, url: "https://media-sfs7.vdotcameras.com/rtplive/MMBT1113/playlist.m3u8" },
+        { name: "MMBT North Bound Mid Tunnel", lat: 36.95291, lng: -76.40750, url: "https://media-sfs8.vdotcameras.com/rtplive/MMBT1108/playlist.m3u8" },
+        { name: "MMBT South Bound Mid Tunnel", lat: 36.95280, lng: -76.40765, url: "https://media-sfs1.vdotcameras.com/rtplive/MMBT1123/playlist.m3u8" },
+        { name: "MMBT South Portal (Suffolk Side)", lat: 36.94733, lng: -76.40500, url: "https://media-sfs2.vdotcameras.com/rtplive/MMBT1126/playlist.m3u8" },
+        { name: "I-664 @ MM 13.2 (Bridge North Bound)", lat: 36.93640, lng: -76.40367, url: "https://media-sfs5.vdotcameras.com/rtplive/MMBT1103/playlist.m3u8" },
+        { name: "I-664 @ MM 11.3 (Bridge South Bound)", lat: 36.93650, lng: -76.40390, url: "https://media-sfs3.vdotcameras.com/rtplive/MMBT1130/playlist.m3u8" }
+      ],
+      i664: [
+        { name: "I-664 / MM 11.2 / SB", lat: 36.89747, lng: -76.42555, url: "https://media-sfs4.vdotcameras.com/rtplive/HamptonRoads621/playlist.m3u8" },
+        { name: "I-664 / MM 11.3 / MMBT / Suffolk Tower", lat: 36.89673, lng: -76.42576, url: "https://media-sfs4.vdotcameras.com/rtplive/MMBT1101/playlist.m3u8" },
+        { name: "I-664 @ Hampton Roads Pkwy / MM 12.8 / SB", lat: 36.87653, lng: -76.43351, url: "https://media-sfs6.vdotcameras.com/rtplive/HamptonRoads620/playlist.m3u8" },
+        { name: "I-664 @ Western Fwy / MM 13.4 / SB", lat: 36.86733, lng: -76.43295, url: "https://media-sfs1.vdotcameras.com/rtplive/HamptonRoads619/playlist.m3u8" },
+        { name: "I-664 @ Western Fwy & Pughsville/ MM 14.0 / SB", lat: 36.85882, lng: -76.43136, url: "https://media-sfs8.vdotcameras.com/rtplive/HamptonRoads618/playlist.m3u8" },
+        { name: "I-664 @ Western Fwy & Pughsville/ MM 14.0 / NB", lat: 36.85872, lng: -76.43038, url: "https://media-sfs7.vdotcameras.com/rtplive/HamptonRoads617/playlist.m3u8" },
+        { name: "I-664 @ Pughsville / MM 14.4 / NB", lat: 36.85267, lng: -76.43114, url: "https://media-sfs6.vdotcameras.com/rtplive/HamptonRoads616/playlist.m3u8" },
+        { name: "I-664 @ Pughsville / MM 14.7 / SB", lat: 36.84877, lng: -76.43343, url: "https://media-sfs5.vdotcameras.com/rtplive/HamptonRoads615/playlist.m3u8" },
+        { name: "I-664 @ Pughsville & Portsmouth Blvd/ MM 15.4 / SB", lat: 36.83851, lng: -76.43401, url: "https://media-sfs4.vdotcameras.com/rtplive/HamptonRoads614/playlist.m3u8" },
+        { name: "I-664 @ Pughsville & Portsmouth Blvd/ MM 15.1 / SB", lat: 36.83022, lng: -76.43370, url: "https://media-sfs3.vdotcameras.com/rtplive/HamptonRoads613/playlist.m3u8" },
+        { name: "I-664 @ Portsmouth Blvd/ MM 16.7 / SB", lat: 36.81928, lng: -76.43281, url: "https://media-sfs2.vdotcameras.com/rtplive/HamptonRoads612/playlist.m3u8" }
+      ]
+    };
+
+    let map, mapHls, wallHls = [];
+
+    function nav(t) {
+      document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
+      document.getElementById('btn-' + t).classList.add('active');
+      if (t === 'map') {
+        document.getElementById('content').style.display = 'none';
+        document.getElementById('map-view').style.display = 'block';
+        initMap();
+        resetMapView();
+      } else {
+        document.getElementById('content').style.display = 'block';
+        document.getElementById('map-view').style.display = 'none';
+        loadGrid(t);
+      }
+    }
+
+    function resetMapView() {
+      if (map) {
+        map.closePopup();
+        if (mapHls) { mapHls.destroy(); mapHls = null; }
+        map.setView([36.90, -76.40], 12);
+        map.invalidateSize();
+      }
+    }
+
+    function loadGrid(g) {
+      const w = document.getElementById('wall');
+      wallHls.forEach(h => h.destroy());
+      wallHls = [];
+      w.innerHTML = "";
+      cameras[g].forEach(c => {
+        const d = document.createElement('div');
+        d.className = 'cam-card';
+        d.innerHTML = `<div class="label"><span>${c.name}</span><button class="btn-loc" onclick="toM(${c.lat},${c.lng})">LOCATE</button></div><video autoplay muted playsinline controls></video>`;
+        w.appendChild(d);
+        play(d.querySelector('video'), c.url, true);
+      });
+    }
+
+    function play(v, u, isW) {
+      if (Hls.isSupported()) {
+        const h = new Hls(); h.loadSource(u); h.attachMedia(v);
+        if (isW) wallHls.push(h); else mapHls = h;
+      }
+    }
+
+    function initMap() {
+      if (map) return;
+      map = L.map('map-view', { zoomControl: false }).setView([36.90, -76.40], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+      [...cameras.mmbt, ...cameras.i664].forEach(c => {
+        const m = L.marker([c.lat, c.lng]).addTo(map);
+        m.on('click', () => {
+          if (mapHls) { mapHls.destroy(); mapHls = null; }
+          const p = L.popup().setLatLng([c.lat, c.lng])
+            .setContent(`<div class="map-pop">${c.name}<video id="mv" autoplay muted playsinline controls></video></div>`)
+            .openOn(map);
+          setTimeout(() => { if (document.getElementById('mv')) play(document.getElementById('mv'), c.url, false); }, 200);
+        });
+      });
+    }
+
+    function toM(lt, lg) { 
+      nav('map'); 
+      setTimeout(() => { 
+        map.setView([lt, lg], 16); 
+        const allMarkers = [];
+        map.eachLayer(layer => { if(layer instanceof L.Marker) allMarkers.push(layer); });
+        const target = allMarkers.find(m => m.getLatLng().lat === lt);
+        if (target) target.fire('click');
+      }, 400); 
+    }
+
+    // SERVICE WORKER REGISTRATION (PWA Requirement)
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('data:text/javascript,self.addEventListener("fetch", (e) => e);');
+    }
+
+    nav('mmbt');
+  </script>
+</body>
+</html>
