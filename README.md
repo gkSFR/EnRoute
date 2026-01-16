@@ -4,7 +4,7 @@ A real-time traffic camera wall and map designed for incident response. This too
 
 ---
 
-# url: https://github.com/gkSFR/EnRoute.git
+# url: https://github.com/gkSFR/EnRoute/
 
 ##  Installation Instructions
 
