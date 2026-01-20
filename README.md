@@ -34,7 +34,8 @@ This option creates a desktop icon that opens EnRoute in its own app-style windo
 3. Click **Next**
 4. Name it: **SFR EnRoute** (or whatever you prefer)
 5. Click **Finish**
-   
+
+   #### *File path may differ
 ---
 
 ##  Features
