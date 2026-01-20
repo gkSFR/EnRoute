@@ -9,19 +9,32 @@ A real-time traffic camera wall and map designed for incident response. This too
 ##  Installation Instructions
 
 ### iPhone (iOS)
-1. Launch **Safari** and navigate to your GitHub Pages URL.
+1. Launch **Safari** and navigate to https://gksfr.github.io/EnRoute/
 2. Tap the **Share** button (square icon with an upward arrow) at the bottom center.
 3. Scroll down and tap **Add to Home Screen**.
 4. Name the app "Patrol Hub" and tap **Add**.
 5. Launch the app from your home screen for a fullscreen view without browser bars.
 
 ### Android
-1. Launch **Chrome** and navigate to your GitHub Pages URL.
+1. Launch **Chrome** and navigate to https://gksfr.github.io/EnRoute/
 2. Tap the **three vertical dots** (menu) in the top-right corner.
 3. Tap **Install app** or **Add to Home Screen**.
 4. Confirm by tapping **Add**.
 5. The app will now be available in your app drawer and home screen.
 
+### Other mobile browsers may work. Instructions are simular, but may vary.
+
+
+### Windows (Desktop Icon / App Window)
+This option creates a desktop icon that opens EnRoute in its own app-style window (no tabs/address bar) and starts **maximized** while keeping the Windows taskbar visible.
+
+1. **Right-click** on your desktop → **New** → **Shortcut**
+2. For the location, paste:
+    #**"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --app="https://gksfr.github.io/EnRoute/" --user-data-dir="%LOCALAPPDATA%\EnRouteApp" --start-maximized**
+3. Click **Next**
+4. Name it: **SFR EnRoute** (or whatever you prefer)
+5. Click **Finish**
+   
 ---
 
 ##  Features
