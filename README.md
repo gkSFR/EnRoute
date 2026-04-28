@@ -12,7 +12,7 @@ A real-time traffic camera wall and map designed for incident response. This too
 1. Launch **Safari** and navigate to https://gksfr.github.io/EnRoute/
 2. Tap the **Share** button (square icon with an upward arrow) at the bottom center.
 3. Scroll down and tap **Add to Home Screen**.
-4. Name the app "Patrol Hub" and tap **Add**.
+4. Name the app "EnRoute" and tap **Add**.
 5. Launch the app from your home screen for a fullscreen view without browser bars.
 
 ### Android
