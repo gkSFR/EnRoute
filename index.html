@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Cache-Control" content="no-store" />
   <title>EnRoute</title>
   
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -16,11 +17,53 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
     body, html { margin: 0; padding: 0; height: 100%; background: #000; color: #fff; font-family: sans-serif; overflow: hidden; }
-    #content { height: calc(100% - 75px); overflow-y: auto; }
-    #map-view { height: calc(100% - 75px); width: 100%; display: none; background: #fff; }
+    #content { height: calc(100% - 75px); overflow-y: auto; display: none; }
+    #map-view, #ev-view { height: calc(100% - 75px); width: 100%; display: none; }
+    #map-view { background: #fff; }
+    #ev-view { background: #000; overflow: hidden; }
+
+    #home {
+      position: fixed; inset: 0; z-index: 30;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(ellipse at 50% 38%, #252525 0%, #111 42%, #000 78%);
+      padding: 16px 16px calc(24px + env(safe-area-inset-bottom));
+      box-sizing: border-box;
+    }
+    #home.hidden { display: none; }
+    .home-inner { width: min(92vw, 560px); text-align: center; }
+    #home-logo {
+      display: none;
+      max-width: min(88vw, 420px);
+      max-height: 28vh;
+      width: auto; height: auto;
+      object-fit: contain;
+      margin: 0 auto 32px;
+    }
+    #home-wordmark {
+      font-size: clamp(2.1rem, 11vw, 3.6rem);
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin: 0 0 36px;
+      color: #fff;
+    }
+    .home-actions { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+    .home-actions button {
+      width: 100%; padding: 16px 20px; font-size: 1.05rem; font-weight: bold;
+      border-radius: 8px; border: 1px solid #0056b3; background: #0056b3; color: #fff;
+    }
+    .home-actions button.secondary { background: #141414; border-color: #444; }
+    @media (min-width: 768px) {
+      #home-logo { max-width: min(70vw, 640px); max-height: 34vh; }
+      .home-actions { flex-direction: row; justify-content: center; gap: 16px; }
+      .home-actions button { max-width: 240px; }
+    }
+
+    body.mode-ev .nav-cam { display: none; }
     
     #wall { display: grid; gap: 4px; padding: 4px; grid-template-columns: 1fr; }
     @media (min-width: 768px) { #wall { grid-template-columns: 1fr 1fr; } }
@@ -31,27 +74,76 @@
     .label { position: absolute; top: 0; left: 0; right: 0; background: rgba(0,0,0,0.85); padding: 8px; font-size: 0.85rem; font-weight: bold; display: flex; justify-content: space-between; z-index: 10; }
     .btn-loc { background: #0056b3; color: white; border: none; padding: 6px 12px; border-radius: 4px; font-size: 0.75rem; cursor: pointer; }
 
-    .nav-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 75px; background: #1a1a1a; display: flex; border-top: 2px solid #444; padding-bottom: env(safe-area-inset-bottom); }
-    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: none; background: none; color: #888; font-size: 0.8rem; font-weight: bold; }
+    .nav-bar { display: none; position: fixed; bottom: 0; left: 0; right: 0; height: 75px; background: #1a1a1a; border-top: 2px solid #444; padding-bottom: env(safe-area-inset-bottom); }
+    body.mode-cameras .nav-bar, body.mode-ev .nav-bar { display: flex; }
+    .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; border: none; background: none; color: #888; font-size: 0.7rem; font-weight: bold; }
     .nav-item.active { color: #fff; background: #333; border-top: 4px solid #0056b3; }
 
     .map-pop { width: 280px; color: #000; font-weight: bold; text-align: center; }
     .map-pop video { width: 100%; aspect-ratio: 16/9; background: #000; margin-top: 8px; border: 2px solid #0056b3; border-radius: 4px; }
+
+    #ev-list { height: 100%; overflow-y: auto; padding: 8px 8px 16px; }
+    #ev-list.hidden { display: none; }
+    #ev-search { width: 100%; box-sizing: border-box; padding: 10px; margin-bottom: 8px; border: 1px solid #444; border-radius: 4px; background: #111; color: #fff; font-size: 1rem; }
+    .ev-mfr, .ev-model, .ev-year { width: 100%; text-align: left; background: none; border: none; color: #fff; padding: 12px 8px; font-size: 1rem; border-bottom: 1px solid #222; }
+    .ev-cat { padding: 10px 8px 2px 20px; color: #8ab4ff; font-size: 0.72rem; font-weight: bold; letter-spacing: 0.1em; text-transform: uppercase; }
+    .ev-model { padding-left: 28px; color: #ddd; }
+    .ev-year { padding-left: 36px; color: #aaa; font-size: 0.9rem; }
+    .ev-pdf-btn { display: block; width: 100%; text-align: left; background: none; border: none; color: #4ea3ff; padding: 10px 8px 10px 36px; font-size: 0.9rem; }
+    .ev-muted { color: #888; padding: 16px; }
+    #ev-pdf { display: none; height: 100%; flex-direction: column; }
+    #ev-pdf.open { display: flex; }
+    #ev-pdf-bar { display: flex; align-items: center; gap: 8px; padding: 8px; background: #1a1a1a; border-bottom: 1px solid #333; }
+    #ev-pdf-bar button { background: #0056b3; color: #fff; border: none; padding: 8px 14px; border-radius: 4px; font-weight: bold; }
+    #ev-pdf-title { flex: 1; font-size: 0.85rem; font-weight: bold; }
+    #ev-pdf-pages { flex: 1; overflow-y: auto; background: #111; }
+    .ev-page { display: block; width: 100%; height: auto; margin: 0 auto 8px; }
   </style>
 </head>
 <body>
 
+  <div id="home">
+    <div class="home-inner">
+      <img id="home-logo" src="enroute-logo.png?v=1" alt="EnRoute" />
+      <h1 id="home-wordmark">EnRoute</h1>
+      <div class="home-actions">
+        <button type="button" onclick="enterMode('cameras')">Cameras</button>
+        <button type="button" class="secondary" onclick="enterMode('ev')">EV Rescue</button>
+      </div>
+    </div>
+  </div>
+
   <div id="content"><div id="wall"></div></div>
   <div id="map-view"></div>
+  <div id="ev-view">
+    <div id="ev-list">
+      <input id="ev-search" type="search" placeholder="Filter make or model" oninput="renderEvList()" />
+      <div id="ev-nav"><p class="ev-muted">Loading guides…</p></div>
+    </div>
+    <div id="ev-pdf">
+      <div id="ev-pdf-bar">
+        <button type="button" onclick="closeEvPdf()">Back</button>
+        <div id="ev-pdf-title"></div>
+      </div>
+      <div id="ev-pdf-pages"></div>
+    </div>
+  </div>
 
   <nav class="nav-bar">
-    <button class="nav-item active" id="btn-mmbt" onclick="nav('mmbt')">MMBT</button>
-    <button class="nav-item" id="btn-i664" onclick="nav('i664')">I-664</button>
-    <button class="nav-item" id="btn-map" onclick="nav('map')">MAP</button>
-    <button class="nav-item" style="color:#ff4444" onclick="location.reload()">SYNC</button>
+    <button class="nav-item nav-cam" id="btn-mmbt" onclick="nav('mmbt')">MMBT</button>
+    <button class="nav-item nav-cam" id="btn-i664" onclick="nav('i664')">I-664</button>
+    <button class="nav-item nav-cam" id="btn-map" onclick="nav('map')">MAP</button>
+    <button class="nav-item" id="btn-home" onclick="goHome()">HOME</button>
+    <button class="nav-item" style="color:#ff4444" onclick="syncNow()">SYNC</button>
   </nav>
 
   <script>
+    const GH_PAT = "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";
+    const GH_REPO = "gkSFR/EnRoute-EVdata";
+    const GH_API = "https://api.github.com/repos/" + GH_REPO + "/contents/";
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
     const cameras = {
       mmbt: [
         { name: "MMBT North Bound Exit (NN Side)", lat: 36.9582, lng: -76.41000, url: "https://media-sfs7.vdotcameras.com/rtplive/MMBT1113/playlist.m3u8" },
@@ -77,18 +169,75 @@
     };
 
     let map, mapHls, wallHls = [];
+    let evTree = null, evOpenMfr = {}, evOpenModel = {}, evPdfDoc = null;
+    let appMode = "home";
+    let camTab = "mmbt";
+
+    function showPane(which) {
+      document.getElementById('content').style.display = which === 'grid' ? 'block' : 'none';
+      document.getElementById('map-view').style.display = which === 'map' ? 'block' : 'none';
+      document.getElementById('ev-view').style.display = which === 'ev' ? 'block' : 'none';
+    }
+
+    function stopLive() {
+      wallHls.forEach(h => h.destroy());
+      wallHls = [];
+      if (mapHls) { mapHls.destroy(); mapHls = null; }
+    }
+
+    function goHome() {
+      appMode = "home";
+      closeEvPdf();
+      stopLive();
+      document.body.classList.remove("mode-cameras", "mode-ev");
+      document.getElementById("home").classList.remove("hidden");
+      showPane("none");
+    }
+
+    function enterMode(mode) {
+      document.getElementById("home").classList.add("hidden");
+      document.body.classList.remove("mode-cameras", "mode-ev");
+      if (mode === "cameras") {
+        appMode = "cameras";
+        document.body.classList.add("mode-cameras");
+        nav(camTab || "mmbt");
+      } else {
+        appMode = "ev";
+        document.body.classList.add("mode-ev");
+        nav("ev");
+      }
+    }
+
+    function syncNow() {
+      if (appMode === "ev") {
+        evTree = null;
+        loadEvIndex();
+        return;
+      }
+      if (camTab === "map") {
+        if (map) map.invalidateSize();
+      } else {
+        loadGrid(camTab);
+      }
+    }
 
     function nav(t) {
+      if (t === "home") { goHome(); return; }
       document.querySelectorAll('.nav-item').forEach(e => e.classList.remove('active'));
-      document.getElementById('btn-' + t).classList.add('active');
+      const btn = document.getElementById('btn-' + t);
+      if (btn) btn.classList.add('active');
       if (t === 'map') {
-        document.getElementById('content').style.display = 'none';
-        document.getElementById('map-view').style.display = 'block';
+        camTab = "map";
+        showPane('map');
         initMap();
         resetMapView();
+      } else if (t === 'ev') {
+        showPane('ev');
+        closeEvPdf();
+        loadEvIndex();
       } else {
-        document.getElementById('content').style.display = 'block';
-        document.getElementById('map-view').style.display = 'none';
+        camTab = t;
+        showPane('grid');
         loadGrid(t);
       }
     }
@@ -132,7 +281,7 @@
         const m = L.marker([c.lat, c.lng]).addTo(map);
         m.on('click', () => {
           if (mapHls) { mapHls.destroy(); mapHls = null; }
-          const p = L.popup().setLatLng([c.lat, c.lng])
+          L.popup().setLatLng([c.lat, c.lng])
             .setContent(`<div class="map-pop">${c.name}<video id="mv" autoplay muted playsinline controls></video></div>`)
             .openOn(map);
           setTimeout(() => { if (document.getElementById('mv')) play(document.getElementById('mv'), c.url, false); }, 200);
@@ -151,13 +300,280 @@
       }, 400); 
     }
 
-    // SERVICE WORKER REGISTRATION (PWA Requirement)
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('data:text/javascript,self.addEventListener("fetch", (e) => e);');
+    function ghHeaders(accept) {
+      return {
+        Authorization: "Bearer " + GH_PAT,
+        Accept: accept || "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
+      };
     }
 
-    nav('mmbt');
+    function yearFromFilename(filename) {
+      const m = String(filename || "").match(/(20\d{2})(?:[-_](20\d{2}))?/);
+      if (!m) return "—";
+      return m[2] && m[2] !== m[1] ? m[1] + "-" + m[2] : m[1];
+    }
+
+    function titleMake(make) {
+      return String(make || "").replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    const EV_CATS = [
+      { id: "sedan", label: "Sedan" },
+      { id: "suv", label: "SUV" },
+      { id: "truck", label: "Truck" }
+    ];
+    const EV_TRUCK_MAKES = {
+      autocar: 1, azure: 1, battle_motors: 1, blue_bird: 1, brightdrop: 1, byd: 1,
+      "e-one": 1, endera: 1, freightliner: 1, freightliner_custom_chassis: 1, gillig: 1,
+      greenpower: 1, hyzon: 1, ic: 1, international: 1, isuzu: 1, kalmar_ottawa: 1,
+      kenworth: 1, lightning: 1, mack: 1, "mcneilus_truck_&_manufacturing": 1, motiv: 1,
+      new_flyer: 1, new_holland: 1, nikola: 1, nova: 1, ohmio: 1, optimal: 1, orange_ev: 1,
+      oshkosh: 1, peterbilt: 1, pierce_manufacturing: 1, ride: 1, rizon: 1, sea_electric: 1,
+      smith: 1, thomas_built_buses: 1, tico: 1, van: 1, van_con: 1, van_hool: 1,
+      volvo_trucks: 1, workhorse: 1
+    };
+
+    function evNorm(s) {
+      return String(s || "").toLowerCase().replace(/[_./-]+/g, " ").replace(/\s+/g, " ").trim();
+    }
+
+    function evHas(text, parts) {
+      return parts.some(p => text.indexOf(p) !== -1);
+    }
+
+    function bodyType(make, model, filename) {
+      const m = evNorm(model);
+      const b = evNorm(make + " " + model + " " + filename);
+      if (evHas(b, ["hummer ev suv"])) return "suv";
+      if (evHas(b, ["hummer ev pickup", "pickup", "pick up", "cybertruck", "semi", "step van", "school bus", "fire truck", "fuel cell truck", "e transit", "promaster", "sprinter"])) return "truck";
+      if (/\bsuv\b/.test(b) || evHas(b, ["crossover"])) return "suv";
+      if (/\b(truck|bus|chassis|spotter|tractor|van)\b/.test(b) && !evHas(m, ["minivan"])) return "truck";
+      if (evHas(b, ["sedan", "saloon", "coupe", "convertible", "hatch", "wagon", "sportback", "estate"])) return "sedan";
+      if (EV_TRUCK_MAKES[make]) return "truck";
+      if (evHas(m, [
+        "mdx", "rdx", "zdx", "tonale", "q4", "q5", "q6", "q8", "bentayga", "ix", "x5", "xm",
+        "escalade", "lyriq", "optiq", "vistiq", "blazer", "bolt euv", "equinox", "tahoe",
+        "aspen", "pacifica", "durango", "hornet", "ocean", "escape", "explorer", "mach e",
+        "cr v", "prologue", "ioniq 5", "ioniq 9", "kona", "nexo", "palisade", "santa fe",
+        "tucson", "tuscon", "ev6", "ev9", "niro", "carnival", "sorento", "sportage", "soul",
+        "cherokee", "wagoneer", "wrangler", "range rover", "lx", "nx", "rx", "tx", "ux", "gx", "rz",
+        "aviator", "corsair", "nautilus", "cx 50", "cx 70", "cx 90", "mx 30", "tribute", "eqb",
+        "countryman", "outlander", "ariya", "rogue", "crosstrek", "forester", "solterra",
+        "cayenne", "macan", "taycan cross", "r1s", "vue", "model y", "model x", "4runner",
+        "bz4x", "c hr", "corolla cross", "crown signia", "highlander", "land cruiser", "rav4",
+        "sequoia", "sienna", "id 4", "id buzz", "touareg", "ec40", "ex30", "ex40", "ex90",
+        "xc40", "xc60", "xc90", "gv60", "gv70", "urus", "gravity", "vf8", "polestar 3",
+        "polestar 4", "mariner", "e tron", "bz woodland", " bz"
+      ]) && !evHas(m, ["e tron gt"])) return "suv";
+      if (m === "bz" || m.indexOf("bz ") === 0) return "suv";
+      if (evHas(m, ["eqs"] ) && evHas(m, ["suv"])) return "suv";
+      if (evHas(m, ["eqe"]) && evHas(m, ["suv"])) return "suv";
+      if (evHas(m, ["g580", "maybach eqs"])) return "suv";
+      if (evHas(m, [
+        "f 150", "lightning", "silverado", "sierra", "maverick", "tundra", "tacoma",
+        "cybertruck", "r1t", "xcient", "b4", "volcon", "commercial van"
+      ])) return "truck";
+      return "sedan";
+    }
+
+    function buildEvTree(entries) {
+      const index = {};
+      entries.forEach(e => {
+        const make = (e.make || "nhtsa").trim().toLowerCase().replace(/\s+/g, "_");
+        const model = (e.model || "").trim() || "—";
+        const url = e.url || "";
+        const filename = url.split("/").pop().split("?")[0];
+        if (!filename || !filename.toLowerCase().endsWith(".pdf")) return;
+        const year = yearFromFilename(filename);
+        const label = /rescue/i.test(filename) || /rescue/i.test(url) ? "Rescue Sheet" : "Guide";
+        if (!index[make]) index[make] = {};
+        if (!index[make][model]) index[make][model] = {};
+        if (!index[make][model][year]) index[make][model][year] = [];
+        if (!index[make][model][year].some(p => p.filename === filename)) {
+          index[make][model][year].push({ label: label, filename: filename, url: url });
+        }
+      });
+      return Object.keys(index).sort().map(make => ({
+        id: make,
+        name: titleMake(make),
+        models: Object.keys(index[make]).sort().map(model => ({
+          name: model,
+          years: Object.keys(index[make][model]).sort((a, b) => (a === "—") - (b === "—") || a.localeCompare(b)).map(year => ({
+            year: year,
+            pdfs: index[make][model][year]
+          }))
+        }))
+      }));
+    }
+
+    async function loadEvIndex() {
+      if (evTree) { renderEvList(); return; }
+      const el = document.getElementById("ev-nav");
+      el.innerHTML = '<p class="ev-muted">Loading guides…</p>';
+      try {
+        const r = await fetch(GH_API + "EV%20Info/_nhtsa_erg_manifest.json?ref=main", { headers: ghHeaders("application/vnd.github.raw") });
+        if (!r.ok) throw new Error("GitHub " + r.status);
+        const entries = await r.json();
+        evTree = buildEvTree(entries);
+        renderEvList();
+      } catch (err) {
+        el.innerHTML = '<p class="ev-muted">Could not load EV index (' + err.message + ').</p>';
+      }
+    }
+
+    function renderEvList() {
+      const q = (document.getElementById("ev-search").value || "").trim().toLowerCase();
+      const el = document.getElementById("ev-nav");
+      if (!evTree) return;
+      const makes = evTree.filter(m => {
+        if (!q) return true;
+        if (m.name.toLowerCase().includes(q) || m.id.includes(q)) return true;
+        return m.models.some(mo => mo.name.toLowerCase().includes(q));
+      });
+      if (!makes.length) {
+        el.innerHTML = '<p class="ev-muted">No matches.</p>';
+        return;
+      }
+      el.innerHTML = "";
+      makes.forEach(mfr => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = "ev-mfr";
+        b.textContent = (evOpenMfr[mfr.id] ? "▼ " : "▶ ") + mfr.name;
+        b.onclick = () => {
+          const open = !evOpenMfr[mfr.id];
+          evOpenMfr = {};
+          evOpenModel = {};
+          if (open) evOpenMfr[mfr.id] = true;
+          renderEvList();
+        };
+        el.appendChild(b);
+        if (!evOpenMfr[mfr.id]) return;
+        const grouped = { sedan: [], suv: [], truck: [] };
+        mfr.models.forEach(model => {
+          if (q && !mfr.name.toLowerCase().includes(q) && !mfr.id.includes(q) && !model.name.toLowerCase().includes(q)) return;
+          const fn = (((model.years[0] || {}).pdfs || [])[0] || {}).filename || "";
+          grouped[bodyType(mfr.id, model.name, fn)].push(model);
+        });
+        EV_CATS.forEach(cat => {
+          if (!grouped[cat.id].length) return;
+          const h = document.createElement("div");
+          h.className = "ev-cat";
+          h.textContent = cat.label;
+          el.appendChild(h);
+          grouped[cat.id].forEach(model => {
+          const mk = mfr.id + "/" + model.name;
+          const mb = document.createElement("button");
+          mb.type = "button";
+          mb.className = "ev-model";
+          mb.textContent = (evOpenModel[mk] ? "▼ " : "▶ ") + model.name;
+          mb.onclick = () => {
+            const open = !evOpenModel[mk];
+            evOpenModel = {};
+            if (open) evOpenModel[mk] = true;
+            renderEvList();
+          };
+          el.appendChild(mb);
+          if (!evOpenModel[mk]) return;
+          model.years.forEach(yr => {
+            const y = document.createElement("div");
+            y.className = "ev-year";
+            y.textContent = yr.year;
+            el.appendChild(y);
+            yr.pdfs.forEach(pdf => {
+              const pb = document.createElement("button");
+              pb.type = "button";
+              pb.className = "ev-pdf-btn";
+              pb.textContent = pdf.label;
+              pb.onclick = () => openEvPdf(mfr.id, pdf.filename, mfr.name + " " + model.name + " " + yr.year + " · " + pdf.label, pdf.url);
+              el.appendChild(pb);
+            });
+          });
+          });
+        });
+      });
+    }
+
+    async function fetchPdfBytes(make, filename, nhtsaUrl) {
+      const path = "EV%20Info/" + encodeURIComponent(make) + "/" + encodeURIComponent(filename);
+      const ghRaw = await fetch(GH_API + path + "?ref=main", { headers: ghHeaders("application/vnd.github.raw") });
+      if (ghRaw.ok) return ghRaw.arrayBuffer();
+      const metaR = await fetch(GH_API + path + "?ref=main", { headers: ghHeaders("application/vnd.github+json") });
+      if (metaR.ok) {
+        const meta = await metaR.json();
+        if (meta.download_url) {
+          const direct = await fetch(meta.download_url);
+          if (direct.ok) return direct.arrayBuffer();
+        }
+      }
+      if (nhtsaUrl) {
+        const pub = await fetch(nhtsaUrl);
+        if (pub.ok) return pub.arrayBuffer();
+      }
+      throw new Error("GitHub " + ghRaw.status);
+    }
+
+    async function openEvPdf(make, filename, title, nhtsaUrl) {
+      document.getElementById("ev-list").classList.add("hidden");
+      document.getElementById("ev-pdf").classList.add("open");
+      document.getElementById("ev-pdf-title").textContent = title;
+      const pages = document.getElementById("ev-pdf-pages");
+      pages.innerHTML = '<p class="ev-muted">Loading PDF…</p>';
+      try {
+        const buf = await fetchPdfBytes(make, filename, nhtsaUrl);
+        if (evPdfDoc) { try { evPdfDoc.destroy(); } catch (e) {} evPdfDoc = null; }
+        evPdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+        pages.innerHTML = "";
+        const maxPages = Math.min(evPdfDoc.numPages, 40);
+        for (let i = 1; i <= maxPages; i++) {
+          const page = await evPdfDoc.getPage(i);
+          const unscaled = page.getViewport({ scale: 1 });
+          const scale = Math.min(2, (pages.clientWidth || 360) / unscaled.width);
+          const viewport = page.getViewport({ scale: scale });
+          const canvas = document.createElement("canvas");
+          canvas.className = "ev-page";
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          pages.appendChild(canvas);
+          await page.render({ canvasContext: canvas.getContext("2d"), viewport: viewport }).promise;
+        }
+        if (evPdfDoc.numPages > maxPages) {
+          const note = document.createElement("p");
+          note.className = "ev-muted";
+          note.textContent = "Showing first " + maxPages + " of " + evPdfDoc.numPages + " pages.";
+          pages.appendChild(note);
+        }
+      } catch (err) {
+        pages.innerHTML = '<p class="ev-muted">Failed to load PDF (' + err.message + ').</p>';
+      }
+    }
+
+    function closeEvPdf() {
+      document.getElementById("ev-pdf").classList.remove("open");
+      document.getElementById("ev-list").classList.remove("hidden");
+      document.getElementById("ev-pdf-pages").innerHTML = "";
+      if (evPdfDoc) { try { evPdfDoc.destroy(); } catch (e) {} evPdfDoc = null; }
+    }
+
+    (function setupHomeLogo() {
+      const img = document.getElementById("home-logo");
+      const mark = document.getElementById("home-wordmark");
+      img.addEventListener("load", function () {
+        img.style.display = "block";
+        mark.style.display = "none";
+      });
+      img.addEventListener("error", function () {
+        img.style.display = "none";
+        mark.style.display = "block";
+      });
+    })();
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (r) { r.unregister(); });
+      });
+    }
   </script>
 </body>
 </html>
-
