@@ -14,7 +14,7 @@
 
   <link rel="manifest" href="data:application/manifest+json,{%22name%22:%22EnRoute%22,%22short_name%22:%22EnRoute%22,%22start_url%22:%22index.html%22,%22display%22:%22standalone%22,%22background_color%22:%22%23000000%22,%22theme_color%22:%22%231a1a1a%22,%22icons%22:[{%22src%22:%22https://vdot.virginia.gov/favicon.ico%22,%22sizes%22:%22192x192%22,%22type%22:%22image/png%22}]}">
 
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="preload" as="image" href="enroute-logo.png?v=2" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -44,6 +44,7 @@
       margin: 0 auto 32px;
     }
     #home-wordmark {
+      display: none;
       font-size: clamp(2.1rem, 11vw, 3.6rem);
       font-weight: 800;
       letter-spacing: 0.14em;
@@ -104,7 +105,7 @@
 
   <div id="home">
     <div class="home-inner">
-      <img id="home-logo" src="enroute-logo.png?v=1" alt="EnRoute" />
+      <img id="home-logo" src="enroute-logo.png?v=2" alt="EnRoute" />
       <h1 id="home-wordmark">EnRoute</h1>
       <div class="home-actions">
         <button type="button" onclick="enterMode('cameras')">Cameras</button>
@@ -557,14 +558,20 @@
     (function setupHomeLogo() {
       const img = document.getElementById("home-logo");
       const mark = document.getElementById("home-wordmark");
-      img.addEventListener("load", function () {
+      function showLogo() {
         img.style.display = "block";
         mark.style.display = "none";
-      });
-      img.addEventListener("error", function () {
+      }
+      function showMark() {
         img.style.display = "none";
         mark.style.display = "block";
-      });
+      }
+      img.addEventListener("load", showLogo);
+      img.addEventListener("error", showMark);
+      if (img.complete) {
+        if (img.naturalWidth) showLogo();
+        else showMark();
+      }
     })();
 
     if ('serviceWorker' in navigator) {
