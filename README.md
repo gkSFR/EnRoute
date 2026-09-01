@@ -1,6 +1,6 @@
-# SFR EnRoute Traffic Hub V.1.0.2
+# SFR EnRoute Traffic Hub V.1.2.2
 
-A real-time traffic camera wall and map designed for incident response. This tool is a **Progressive Web App (PWA)**, allowing it to be installed on mobile devices or desktop for a native, fullscreen viewing.
+A real-time traffic camera wall, map, and EV rescue guide library designed for incident response. This tool is a **Progressive Web App (PWA)**, allowing it to be installed on mobile devices or desktop for a native, fullscreen viewing.
 
 ---
 
@@ -41,11 +41,14 @@ This option creates a desktop icon that opens EnRoute in its own app-style windo
 ---
 
 ##  Features
+* **Home screen**: Opens on the EnRoute logo. Choose **Cameras** or **EV Rescue**. **HOME** returns to this screen.
 * **Live Camera Grid**: HLS streams for the MMBT and I-664 corridor.
 * **Integrated Street Map**: Simple, high-contrast street map with verified GPS locations.
 * **Auto-Reset Map**: Every time the **MAP** tab is clicked, it clears active videos and recenters the view.
 * **One-Touch Locate**: Tap the **LOCATE** button on any camera card to instantly jump to that pin on the map.
-* **Sync Button**: Tap the red **SYNC** button to force a hard refresh of all video feeds if they freeze.
+* **EV Rescue**: Sort by make, then sedan / SUV / truck (only types that exist for that make), then model and year. Opens the matching emergency response guide or rescue sheet.
+* **PDF viewer**: Zoom with **−** / **+** / **Fit**. On PC, **Ctrl + mouse wheel** or **−** / **+** keys. Phone screens render at device resolution so text stays readable.
+* **Sync Button**: In Cameras, reloads the current video wall. In EV Rescue, reloads the guide list.
 
 ---
 
@@ -53,6 +56,8 @@ This option creates a desktop icon that opens EnRoute in its own app-style windo
 * **Black Boxes on Map**: Ensure you close the current map video before clicking another pin (though the code is designed to auto-kill previous streams).
 * **Buffering**: If video freezes during tower handoffs while driving, tap the **SYNC** button in the bottom nav.
 * **Map Not Loading**: Ensure you have an active data connection; the map tiles require internet access to render.
+* **EV Rescue not loading**: Needs an active data connection. Tap **SYNC** on the EV screen, or go **HOME** and open EV Rescue again.
+* **Installed app looks old after an update**: Fully close EnRoute (swipe it away on Android / iPhone) and reopen it. If it still looks stale, remove it from the home screen and Add to Home Screen again.
 
 ---
 *Created for SFR Operations.*
