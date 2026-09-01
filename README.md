@@ -29,11 +29,13 @@ A real-time traffic camera wall and map designed for incident response. This too
 This option creates a desktop icon that opens EnRoute in its own app-style window (no tabs/address bar) and starts **maximized** while keeping the Windows taskbar visible.
 
 1. **Right-click** on your desktop → **New** → **Shortcut**
-2. For the location, paste:
+2. Depending on file path, for the location, paste:
     ### "C:\Program Files (x86)\Google\Chrome\Application\chrome.exe" --app="https://gksfr.github.io/EnRoute/" --user-data-dir="%LOCALAPPDATA%\EnRouteApp" --start-maximized
-3. Click **Next**
-4. Name it: **SFR EnRoute** (or whatever you prefer)
-5. Click **Finish**
+   ## or
+   ### "C:\Program Files\Google\Chrome\Application\chrome.exe" --app="https://gksfr.github.io/EnRoute/" --user-data-dir="%LOCALAPPDATA%\EnRouteApp" --start-maximized
+4. Click **Next**
+5. Name it: **SFR EnRoute** (or whatever you prefer)
+6. Click **Finish**
 
    #### *File path may differ
 ---
