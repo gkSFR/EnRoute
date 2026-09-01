@@ -96,9 +96,12 @@
     #ev-pdf.open { display: flex; }
     #ev-pdf-bar { display: flex; align-items: center; gap: 8px; padding: 8px; background: #1a1a1a; border-bottom: 1px solid #333; }
     #ev-pdf-bar button { background: #0056b3; color: #fff; border: none; padding: 8px 14px; border-radius: 4px; font-weight: bold; }
-    #ev-pdf-title { flex: 1; font-size: 0.85rem; font-weight: bold; }
-    #ev-pdf-pages { flex: 1; overflow-y: auto; background: #111; }
-    .ev-page { display: block; width: 100%; height: auto; margin: 0 auto 8px; }
+    #ev-pdf-title { flex: 1; min-width: 0; font-size: 0.85rem; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ev-pdf-zoom { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    #ev-pdf-zoom button { padding: 8px 11px; min-width: 36px; }
+    #ev-pdf-zoom-label { font-size: 0.8rem; min-width: 3.4em; text-align: center; color: #ddd; }
+    #ev-pdf-pages { flex: 1; overflow: auto; background: #111; }
+    .ev-page { display: block; width: auto; height: auto; max-width: none; margin: 0 auto 8px; }
   </style>
 </head>
 <body>
@@ -125,6 +128,12 @@
       <div id="ev-pdf-bar">
         <button type="button" onclick="closeEvPdf()">Back</button>
         <div id="ev-pdf-title"></div>
+        <div id="ev-pdf-zoom">
+          <button type="button" onclick="evPdfZoom(-1)" title="Zoom out">−</button>
+          <span id="ev-pdf-zoom-label">Fit</span>
+          <button type="button" onclick="evPdfZoom(1)" title="Zoom in">+</button>
+          <button type="button" onclick="evPdfZoom(0)" title="Fit width">Fit</button>
+        </div>
       </div>
       <div id="ev-pdf-pages"></div>
     </div>
@@ -170,6 +179,7 @@
 
     let map, mapHls, wallHls = [];
     let evTree = null, evOpenMfr = {}, evOpenModel = {}, evPdfDoc = null;
+    let evPdfZoomMul = 1, evPdfZoomTimer = null, evPdfRendering = false, evPdfNeedsRender = false;
     let appMode = "home";
     let camTab = "mmbt";
 
@@ -519,16 +529,42 @@
       document.getElementById("ev-pdf-title").textContent = title;
       const pages = document.getElementById("ev-pdf-pages");
       pages.innerHTML = '<p class="ev-muted">Loading PDF…</p>';
+      evPdfZoomMul = window.innerWidth >= 768 ? 0.5 : 1;
       try {
         const buf = await fetchPdfBytes(make, filename, nhtsaUrl);
         if (evPdfDoc) { try { evPdfDoc.destroy(); } catch (e) {} evPdfDoc = null; }
         evPdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
-        pages.innerHTML = "";
+        await renderEvPdfPages();
+      } catch (err) {
+        pages.innerHTML = '<p class="ev-muted">Failed to load PDF (' + err.message + ').</p>';
+      }
+    }
+
+    function evPdfZoom(dir) {
+      if (!evPdfDoc) return;
+      if (dir === 0) evPdfZoomMul = window.innerWidth >= 768 ? 0.5 : 1;
+      else evPdfZoomMul = Math.max(0.25, Math.min(2.5, Math.round((evPdfZoomMul + dir * 0.15) * 100) / 100));
+      clearTimeout(evPdfZoomTimer);
+      evPdfZoomTimer = setTimeout(renderEvPdfPages, 60);
+    }
+
+    async function renderEvPdfPages() {
+      if (!evPdfDoc) return;
+      if (evPdfRendering) { evPdfNeedsRender = true; return; }
+      evPdfRendering = true;
+      const pages = document.getElementById("ev-pdf-pages");
+      const label = document.getElementById("ev-pdf-zoom-label");
+      if (label) label.textContent = Math.round(evPdfZoomMul * 100) + "%";
+      const keep = pages.scrollTop;
+      pages.innerHTML = "";
+      try {
         const maxPages = Math.min(evPdfDoc.numPages, 40);
+        const first = await evPdfDoc.getPage(1);
+        const unscaled = first.getViewport({ scale: 1 });
+        const fitW = Math.max(1, pages.clientWidth || 360) / unscaled.width;
+        const scale = Math.max(0.15, Math.min(3, fitW * evPdfZoomMul));
         for (let i = 1; i <= maxPages; i++) {
-          const page = await evPdfDoc.getPage(i);
-          const unscaled = page.getViewport({ scale: 1 });
-          const scale = Math.min(2, (pages.clientWidth || 360) / unscaled.width);
+          const page = i === 1 ? first : await evPdfDoc.getPage(i);
           const viewport = page.getViewport({ scale: scale });
           const canvas = document.createElement("canvas");
           canvas.className = "ev-page";
@@ -543,8 +579,13 @@
           note.textContent = "Showing first " + maxPages + " of " + evPdfDoc.numPages + " pages.";
           pages.appendChild(note);
         }
-      } catch (err) {
-        pages.innerHTML = '<p class="ev-muted">Failed to load PDF (' + err.message + ').</p>';
+        pages.scrollTop = keep;
+      } finally {
+        evPdfRendering = false;
+        if (evPdfNeedsRender) {
+          evPdfNeedsRender = false;
+          renderEvPdfPages();
+        }
       }
     }
 
@@ -573,6 +614,18 @@
         else showMark();
       }
     })();
+
+    document.getElementById("ev-pdf-pages").addEventListener("wheel", function (e) {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      evPdfZoom(e.deltaY > 0 ? -1 : 1);
+    }, { passive: false });
+
+    document.addEventListener("keydown", function (e) {
+      if (!document.getElementById("ev-pdf").classList.contains("open")) return;
+      if (e.key === "-" || e.key === "_") { e.preventDefault(); evPdfZoom(-1); }
+      if (e.key === "=" || e.key === "+") { e.preventDefault(); evPdfZoom(1); }
+    });
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.getRegistrations().then(function (regs) {
